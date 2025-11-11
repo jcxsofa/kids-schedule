@@ -170,9 +170,25 @@ const IconPicker = ({ value, onChange }) => {
 // Settings page component
 const SettingsPage = ({ schedule, onScheduleChange, dayNames, onClose, timeFormat, onTimeFormatChange }) => {
   const [selectedDay, setSelectedDay] = useState('mon');
+  const [editingTimeIndex, setEditingTimeIndex] = useState(null);
+  const [editingTimeValue, setEditingTimeValue] = useState('');
   
-  const currentDaySchedule = schedule[selectedDay] || [];
-  
+  // Sort activities by time before rendering
+  const parseTime = (t) => {
+    // Handles "5:30 - 6:30 PM" and "7:00 AM"
+    if (!t) return 0;
+    let timeStr = t.split('-')[0].trim();
+    let match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+    if (!match) return 0;
+    let hour = parseInt(match[1], 10);
+    let min = parseInt(match[2], 10);
+    let ampm = match[3] ? match[3].toUpperCase() : '';
+    if (ampm === 'PM' && hour < 12) hour += 12;
+    if (ampm === 'AM' && hour === 12) hour = 0;
+    return hour * 60 + min;
+  };
+  const currentDaySchedule = (schedule[selectedDay] || []).slice().sort((a, b) => parseTime(a.time) - parseTime(b.time));
+
   const updateActivity = (index, field, value) => {
     const updated = [...currentDaySchedule];
     updated[index] = { ...updated[index], [field]: value };
@@ -190,6 +206,17 @@ const SettingsPage = ({ schedule, onScheduleChange, dayNames, onClose, timeForma
       activity: '🎯 New activity', 
       type: 'free',
       key: selectedDay 
+    }];
+    onScheduleChange({ ...schedule, [selectedDay]: updated });
+  };
+
+  // Add an empty flexible todo slot that users can fill later
+  const addEmptySlot = () => {
+    const updated = [...currentDaySchedule, {
+      time: '',
+      activity: '✏️ Open - pick a to-do!',
+      type: 'flexible',
+      key: selectedDay
     }];
     onScheduleChange({ ...schedule, [selectedDay]: updated });
   };
@@ -252,11 +279,24 @@ const SettingsPage = ({ schedule, onScheduleChange, dayNames, onClose, timeForma
                   React.createElement('label', { className: 'text-sm font-bold text-gray-600' }, 'Time'),
                   React.createElement('input', {
                     type: 'time',
-                    value: item.time.match(/\d{1,2}:\d{2}/) ? item.time.match(/\d{1,2}:\d{2}/)[0] : '',
+                    value: editingTimeIndex === idx ? editingTimeValue : (item.time.match(/\d{1,2}:\d{2}/) ? item.time.match(/\d{1,2}:\d{2}/)[0] : ''),
                     onChange: (e) => {
-                      // Keep AM/PM if present, otherwise just set time
+                      // Store the value in local state, don't update schedule yet
+                      setEditingTimeIndex(idx);
+                      setEditingTimeValue(e.target.value);
+                    },
+                    onBlur: (e) => {
+                      // After editing is done, reorder the activities
                       const ampm = item.time.match(/AM|PM/);
-                      updateActivity(idx, 'time', e.target.value + (ampm ? ' ' + ampm[0] : ''));
+                      const newTime = editingTimeValue + (ampm ? ' ' + ampm[0] : '');
+                      const updated = [...currentDaySchedule];
+                      updated[idx] = { ...updated[idx], time: newTime };
+                      // Sort by time
+                      const sorted = updated.slice().sort((a, b) => parseTime(a.time) - parseTime(b.time));
+                      onScheduleChange({ ...schedule, [selectedDay]: sorted });
+                      // Clear editing state
+                      setEditingTimeIndex(null);
+                      setEditingTimeValue('');
                     },
                     className: 'w-full px-3 py-2 border-2 border-blue-300 rounded-lg focus:outline-none focus:border-blue-500 text-sm'
                   })
@@ -297,6 +337,10 @@ const SettingsPage = ({ schedule, onScheduleChange, dayNames, onClose, timeForma
             onClick: addActivity,
             className: 'px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 font-bold'
           }, '➕ Add Activity'),
+          React.createElement('button', {
+            onClick: addEmptySlot,
+            className: 'px-4 py-2 bg-teal-500 text-white rounded-lg hover:bg-teal-600 font-bold'
+          }, '➕ Add Empty Slot'),
           React.createElement('button', {
             onClick: resetDay,
             className: 'px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-bold'
@@ -545,7 +589,22 @@ const KidsSchedulePWA = () => {
               style: { scrollSnapAlign: 'center' }
             },
               React.createElement('div', { className: `${day === 'sat' || day === 'sun' ? 'bg-green-500' : 'bg-purple-600'} text-white p-3 rounded-lg text-center font-bold text-lg mb-4 w-full` }, dayNames[day]),
-              activities.map((item, idx) =>
+              activities.slice().sort((a, b) => {
+                // Sort by time
+                const parseTime = (t) => {
+                  if (!t) return 0;
+                  let timeStr = t.split('-')[0].trim();
+                  let match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+                  if (!match) return 0;
+                  let hour = parseInt(match[1], 10);
+                  let min = parseInt(match[2], 10);
+                  let ampm = match[3] ? match[3].toUpperCase() : '';
+                  if (ampm === 'PM' && hour < 12) hour += 12;
+                  if (ampm === 'AM' && hour === 12) hour = 0;
+                  return hour * 60 + min;
+                };
+                return parseTime(a.time) - parseTime(b.time);
+              }).map((item, idx) =>
                 React.createElement('div', { key: idx, className: `${getActivityColor(item.type)} p-3 mb-2 rounded-lg w-full flex items-center justify-between` },
                   React.createElement('div', { className: 'font-bold text-purple-700 text-sm' }, formatTimeForDisplay(item.time, timeFormat)),
                   React.createElement('div', {
@@ -591,7 +650,21 @@ const KidsSchedulePWA = () => {
           ),
           React.createElement('h2', { className: 'text-3xl font-bold text-purple-600 text-center mb-6' }, dayNames[selectedDay]),
           React.createElement('div', { className: 'space-y-3' },
-            weekSchedule[selectedDay].map((item, idx) =>
+            weekSchedule[selectedDay].slice().sort((a, b) => {
+              const parseTime = (t) => {
+                if (!t) return 0;
+                let timeStr = t.split('-')[0].trim();
+                let match = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+                if (!match) return 0;
+                let hour = parseInt(match[1], 10);
+                let min = parseInt(match[2], 10);
+                let ampm = match[3] ? match[3].toUpperCase() : '';
+                if (ampm === 'PM' && hour < 12) hour += 12;
+                if (ampm === 'AM' && hour === 12) hour = 0;
+                return hour * 60 + min;
+              };
+              return parseTime(a.time) - parseTime(b.time);
+            }).map((item, idx) =>
               React.createElement('div', { 
                 key: idx, 
                 className: `${getActivityColor(item.type)} p-4 rounded-xl flex items-center gap-4`,
