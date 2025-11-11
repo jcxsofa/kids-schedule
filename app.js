@@ -270,6 +270,27 @@ const KidsSchedulePWA = () => {
     setTodos(todos.filter(t => t.id !== todo.id));
   };
 
+  // Unassign a previously-assigned todo from a slot and return it to the todos list
+  const unassignSlot = (day, slotIndex) => {
+    setWeekSchedule(prev => {
+      const updated = { ...prev };
+      const slot = updated[day][slotIndex];
+      if (!slot || !slot.todoId) return prev;
+
+      // Recreate the todo item from the slot and add it back to the list
+      const restoredTodo = { id: slot.todoId, text: slot.activity, completed: false };
+      setTodos(prevTodos => {
+        // Avoid duplicate ids: if an id already exists, give the restored item a new id
+        const exists = prevTodos.find(t => t.id === restoredTodo.id);
+        return [...prevTodos, exists ? { ...restoredTodo, id: Date.now() } : restoredTodo];
+      });
+
+      // Reset the slot back to a flexible open slot
+      updated[day] = updated[day].map((s, i) => i === slotIndex ? { ...s, activity: '✏️ Open - pick a to-do!', type: 'flexible', todoId: undefined } : s);
+      return updated;
+    });
+  };
+
   // Load saved data from localStorage
   useEffect(() => {
     const savedTodos = JSON.parse(localStorage.getItem('kidsTodos') || '[]');
@@ -360,7 +381,8 @@ const KidsSchedulePWA = () => {
       free: 'bg-pink-100 border-l-4 border-pink-500',
       evening: 'bg-orange-100 border-l-4 border-orange-500',
       sleep: 'bg-indigo-100 border-l-4 border-indigo-500',
-      flexible: 'bg-green-50 border-2 border-dashed border-green-500'
+      flexible: 'bg-green-50 border-2 border-dashed border-green-500',
+      assigned: 'bg-green-100 border-2 border-green-500'
     };
     return colors[type] || 'bg-gray-100';
   };
@@ -490,7 +512,17 @@ const KidsSchedulePWA = () => {
                         placeholder: 'Type a to-do here or drag one from above...',
                         className: 'w-full bg-white border border-green-400 rounded px-2 py-1 text-xs focus:outline-none focus:border-green-600 cursor-pointer'
                       })
-                    : item.activity
+                    : (
+                      item.type === 'assigned'
+                        ? React.createElement('div', { className: 'flex items-center justify-center gap-2' },
+                            React.createElement('span', null, item.activity),
+                            React.createElement('button', {
+                              onClick: () => unassignSlot(day, idx),
+                              className: 'text-sm text-red-600 hover:text-red-800 px-2 py-1 rounded'
+                            }, '↩️ Unassign')
+                          )
+                        : item.activity
+                    )
                 )
               )
             )
@@ -527,7 +559,17 @@ const KidsSchedulePWA = () => {
                       placeholder: 'Type a to-do item here or drag one from the list above...',
                       className: 'w-full bg-white border-2 border-green-400 rounded-lg px-4 py-2 focus:outline-none focus:border-green-600'
                     })
-                  : React.createElement('div', { className: 'text-lg' }, item.activity)
+                  : (
+                    item.type === 'assigned'
+                      ? React.createElement('div', { className: 'flex items-center justify-between' },
+                          React.createElement('div', { className: 'text-lg' }, item.activity),
+                          React.createElement('button', {
+                            onClick: () => unassignSlot(selectedDay, idx),
+                            className: 'ml-4 text-sm text-red-600 hover:text-red-800 px-2 py-1 rounded'
+                          }, '↩️ Unassign')
+                        )
+                      : React.createElement('div', { className: 'text-lg' }, item.activity)
+                  )
               )
             )
           )
