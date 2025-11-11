@@ -1,5 +1,69 @@
 const { useState, useEffect } = React;
 
+// Time format conversion utilities
+const convertTo12hr = (time24) => {
+  if (!time24 || typeof time24 !== 'string') return time24;
+  
+  // Handle range format like "5:30 - 6:30 PM" or "5:30-6:30" 
+  if (time24.includes('-')) {
+    const parts = time24.split('-').map(p => convertTo12hr(p.trim()));
+    return parts.join(' - ');
+  }
+  
+  // Handle already formatted 12hr times
+  if (time24.match(/AM|PM/i)) {
+    return time24;
+  }
+  
+  // Parse HH:MM format
+  const match = time24.match(/(\d{1,2}):(\d{2})/);
+  if (!match) return time24;
+  
+  let hours = parseInt(match[1]);
+  const minutes = match[2];
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  if (hours > 12) hours -= 12;
+  if (hours === 0) hours = 12;
+  
+  return `${hours}:${minutes} ${ampm}`;
+};
+
+const convertTo24hr = (time12) => {
+  if (!time12 || typeof time12 !== 'string') return time12;
+  
+  // Handle range format like "5:30 - 6:30 PM"
+  if (time12.includes('-') && !time12.match(/^\d{1,2}:\d{2}$/)) {
+    const parts = time12.split('-').map(p => convertTo24hr(p.trim()));
+    return parts.join(' - ');
+  }
+  
+  // Handle already formatted 24hr times
+  if (!time12.match(/AM|PM/i)) {
+    return time12;
+  }
+  
+  // Parse HH:MM AM/PM format
+  const match = time12.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!match) return time12;
+  
+  let hours = parseInt(match[1]);
+  const minutes = match[2];
+  const period = match[3].toUpperCase();
+  
+  if (period === 'PM' && hours !== 12) hours += 12;
+  if (period === 'AM' && hours === 12) hours = 0;
+  
+  return `${String(hours).padStart(2, '0')}:${minutes}`;
+};
+
+const formatTimeForDisplay = (time, format) => {
+  if (format === '12') {
+    return convertTo12hr(time);
+  } else {
+    return convertTo24hr(time);
+  }
+};
+
 // Default schedule template
 const DEFAULT_SCHEDULE = {
   mon: [
@@ -104,7 +168,7 @@ const IconPicker = ({ value, onChange }) => {
 };
 
 // Settings page component
-const SettingsPage = ({ schedule, onScheduleChange, dayNames, onClose }) => {
+const SettingsPage = ({ schedule, onScheduleChange, dayNames, onClose, timeFormat, onTimeFormatChange }) => {
   const [selectedDay, setSelectedDay] = useState('mon');
   
   const currentDaySchedule = schedule[selectedDay] || [];
@@ -147,6 +211,23 @@ const SettingsPage = ({ schedule, onScheduleChange, dayNames, onClose }) => {
       ),
       
       React.createElement('p', { className: 'text-gray-600 mb-6' }, 'Customize your weekly schedule. Select a day and edit the activities.'),
+      
+      // Time format toggle
+      React.createElement('div', { className: 'bg-blue-50 border-2 border-blue-300 rounded-lg p-4 mb-8' },
+        React.createElement('div', { className: 'flex items-center justify-between' },
+          React.createElement('label', { className: 'text-lg font-bold text-blue-600' }, '⏰ Time Format'),
+          React.createElement('div', { className: 'flex gap-2' },
+            React.createElement('button', {
+              onClick: () => onTimeFormatChange('12'),
+              className: `px-4 py-2 rounded-lg font-bold transition-all ${timeFormat === '12' ? 'bg-blue-600 text-white' : 'bg-white text-blue-600 border-2 border-blue-300 hover:bg-blue-100'}`
+            }, '12-Hour (7:30 AM)'),
+            React.createElement('button', {
+              onClick: () => onTimeFormatChange('24'),
+              className: `px-4 py-2 rounded-lg font-bold transition-all ${timeFormat === '24' ? 'bg-blue-600 text-white' : 'bg-white text-blue-600 border-2 border-blue-300 hover:bg-blue-100'}`
+            }, '24-Hour (07:30)')
+          )
+        )
+      ),
       
       // Day selector
       React.createElement('div', { className: 'flex gap-2 justify-center mb-8 flex-wrap' },
@@ -234,6 +315,7 @@ const KidsSchedulePWA = () => {
   const [mainView, setMainView] = useState('schedule'); // 'schedule' or 'settings'
   const [view, setView] = useState('grid');
   const [selectedDay, setSelectedDay] = useState('mon');
+  const [timeFormat, setTimeFormat] = useState('12');
   const [todos, setTodos] = useState([
     { id: 1, text: '📚 Read 3 chapters for book report', completed: false },
     { id: 2, text: '🧹 Clean out backpack', completed: false },
@@ -296,10 +378,12 @@ const KidsSchedulePWA = () => {
     const savedTodos = JSON.parse(localStorage.getItem('kidsTodos') || '[]');
     const savedSlots = JSON.parse(localStorage.getItem('kidsFlexibleSlots') || '{}');
     const savedSchedule = JSON.parse(localStorage.getItem('kidsSchedule') || 'null');
+    const savedTimeFormat = localStorage.getItem('kidsTimeFormat') || '12';
     
     if (savedTodos.length > 0) setTodos(savedTodos);
     if (Object.keys(savedSlots).length > 0) setFlexibleSlots(savedSlots);
     if (savedSchedule) setWeekSchedule(savedSchedule);
+    if (savedTimeFormat) setTimeFormat(savedTimeFormat);
   }, []);
 
   // Save todos to localStorage
@@ -316,6 +400,11 @@ const KidsSchedulePWA = () => {
   useEffect(() => {
     localStorage.setItem('kidsSchedule', JSON.stringify(weekSchedule));
   }, [weekSchedule]);
+
+  // Save time format to localStorage
+  useEffect(() => {
+    localStorage.setItem('kidsTimeFormat', timeFormat);
+  }, [timeFormat]);
 
   const toggleTodo = (id) => {
     setTodos(todos.map(todo => 
@@ -409,7 +498,9 @@ const KidsSchedulePWA = () => {
       schedule: weekSchedule,
       onScheduleChange: setWeekSchedule,
       dayNames: dayNames,
-      onClose: () => setMainView('schedule')
+      onClose: () => setMainView('schedule'),
+      timeFormat: timeFormat,
+      onTimeFormatChange: setTimeFormat
     });
   }
 
@@ -456,7 +547,7 @@ const KidsSchedulePWA = () => {
               React.createElement('div', { className: `${day === 'sat' || day === 'sun' ? 'bg-green-500' : 'bg-purple-600'} text-white p-3 rounded-lg text-center font-bold text-lg mb-4 w-full` }, dayNames[day]),
               activities.map((item, idx) =>
                 React.createElement('div', { key: idx, className: `${getActivityColor(item.type)} p-3 mb-2 rounded-lg w-full flex items-center justify-between` },
-                  React.createElement('div', { className: 'font-bold text-purple-700 text-sm' }, item.time),
+                  React.createElement('div', { className: 'font-bold text-purple-700 text-sm' }, formatTimeForDisplay(item.time, timeFormat)),
                   React.createElement('div', {
                     className: 'text-sm mt-1 flex-1 text-center',
                     onDragOver: (e) => e.preventDefault(),
@@ -507,7 +598,7 @@ const KidsSchedulePWA = () => {
                 onDragOver: item.type === 'flexible' ? (e) => e.preventDefault() : undefined,
                 onDrop: item.type === 'flexible' ? () => handleSlotDrop(item.key) : undefined
               },
-                React.createElement('div', { className: 'font-bold text-purple-700 min-w-[140px]' }, item.time),
+                React.createElement('div', { className: 'font-bold text-purple-700 min-w-[140px]' }, formatTimeForDisplay(item.time, timeFormat)),
                 React.createElement('div', { className: 'flex-1' },
                   item.type === 'flexible'
                     ? React.createElement('input', {
