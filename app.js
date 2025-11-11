@@ -387,6 +387,23 @@ const KidsSchedulePWA = () => {
     return colors[type] || 'bg-gray-100';
   };
 
+  // Print only the schedule area (opens a new window with the schedule markup & Tailwind)
+  const printSchedule = () => {
+    const el = document.getElementById('schedule-area');
+    if (!el) {
+      alert('Schedule element not found to print.');
+      return;
+    }
+    const w = window.open('', '_blank', 'scrollbars=yes,resizable=yes');
+    const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Print Schedule</title><script src="https://cdn.tailwindcss.com"></script></head><body class="p-6 bg-white">${el.outerHTML}</body></html>`;
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    // Give it a moment to load Tailwind then print
+    setTimeout(() => { try { w.print(); } catch (e) { console.error(e); } }, 600);
+  };
+
   if (mainView === 'settings') {
     return React.createElement(SettingsPage, {
       schedule: weekSchedule,
@@ -400,13 +417,125 @@ const KidsSchedulePWA = () => {
     React.createElement('div', { className: 'max-w-7xl mx-auto bg-white rounded-3xl shadow-2xl p-6 md:p-8' },
       React.createElement('div', { className: 'text-center mb-8 flex items-center justify-between' },
         React.createElement('h1', { className: 'text-4xl md:text-5xl font-bold text-purple-600 flex-1 text-center' }, '📅 My Weekly Schedule'),
-        React.createElement('button', {
-          onClick: () => setMainView('settings'),
-          className: 'px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-bold'
-        }, '⚙️ Settings')
+        React.createElement('div', { className: 'flex gap-2 items-center' },
+          React.createElement('button', {
+            onClick: () => setMainView('settings'),
+            className: 'px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-bold'
+          }, '⚙️ Settings'),
+          React.createElement('button', {
+            onClick: printSchedule,
+            className: 'px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 font-bold'
+          }, '🖨️ Print Schedule')
+        )
       ),
       React.createElement('p', { className: 'text-gray-600 text-lg text-center mb-8' }, 'Each day is different - here\'s what happens!'),
+
+      // Schedule wrapper that will be printed
+      React.createElement('div', { id: 'schedule-area' },
+        React.createElement('div', { className: 'flex gap-3 justify-center mb-8 flex-wrap' },
+          React.createElement('button', {
+            onClick: () => setView('grid'),
+            className: `px-6 py-3 rounded-xl font-bold text-lg transition-all ${view === 'grid' ? 'bg-purple-600 text-white shadow-lg' : 'bg-purple-100 text-purple-600 hover:bg-purple-200'}`
+          }, '📊 See Whole Week'),
+          React.createElement('button', {
+            onClick: () => setView('single'),
+            className: `px-6 py-3 rounded-xl font-bold text-lg transition-all ${view === 'single' ? 'bg-purple-600 text-white shadow-lg' : 'bg-purple-100 text-purple-600 hover:bg-purple-200'}`
+          }, '📱 One Day at a Time')
+        ),
+
+        view === 'grid' && React.createElement('div', {
+          className: 'flex gap-6 overflow-x-auto pb-4 -mx-6 px-6',
+          style: { scrollSnapType: 'x mandatory' }
+        },
+          Object.entries(weekSchedule).map(([day, activities]) =>
+            React.createElement('div', {
+              key: day,
+              className: 'bg-gray-50 rounded-xl p-4 shadow-md flex-shrink-0 min-w-[260px] flex flex-col',
+              style: { scrollSnapAlign: 'center' }
+            },
+              React.createElement('div', { className: `${day === 'sat' || day === 'sun' ? 'bg-green-500' : 'bg-purple-600'} text-white p-3 rounded-lg text-center font-bold text-lg mb-4 w-full` }, dayNames[day]),
+              activities.map((item, idx) =>
+                React.createElement('div', { key: idx, className: `${getActivityColor(item.type)} p-3 mb-2 rounded-lg w-full flex items-center justify-between` },
+                  React.createElement('div', { className: 'font-bold text-purple-700 text-sm' }, item.time),
+                  React.createElement('div', {
+                    className: 'text-sm mt-1 flex-1 text-center',
+                    onDragOver: (e) => e.preventDefault(),
+                    onDrop: item.type === 'flexible' ? () => handleSlotDrop(item.key) : undefined
+                  },
+                    item.type === 'flexible'
+                      ? React.createElement('input', {
+                          type: 'text',
+                          value: flexibleSlots[item.key] || '',
+                          onChange: (e) => updateFlexibleSlot(item.key, e.target.value),
+                          placeholder: 'Type a to-do here or drag one from above...',
+                          className: 'w-full bg-white border border-green-400 rounded px-2 py-1 text-xs focus:outline-none focus:border-green-600 cursor-pointer'
+                        })
+                      : (
+                        item.type === 'assigned'
+                          ? React.createElement('div', { className: 'flex items-center justify-center gap-2' },
+                              React.createElement('span', null, item.activity),
+                              React.createElement('button', {
+                                onClick: () => unassignSlot(day, idx),
+                                className: 'text-sm text-red-600 hover:text-red-800 px-2 py-1 rounded'
+                              }, '↩️ Unassign')
+                            )
+                          : item.activity
+                      )
+                  )
+                )
+              )
+            )
+          )
+        ),
+
+        view === 'single' && React.createElement('div', null,
+          React.createElement('div', { className: 'flex gap-2 justify-center mb-6 flex-wrap' },
+            Object.keys(dayNames).map(day =>
+              React.createElement('button', {
+                key: day,
+                onClick: () => setSelectedDay(day),
+                className: `px-4 py-2 rounded-lg font-bold transition-all ${selectedDay === day ? 'bg-purple-600 text-white' : 'bg-white border-2 border-purple-600 text-purple-600 hover:bg-purple-100'}`
+              }, dayNames[day])
+            )
+          ),
+          React.createElement('h2', { className: 'text-3xl font-bold text-purple-600 text-center mb-6' }, dayNames[selectedDay]),
+          React.createElement('div', { className: 'space-y-3' },
+            weekSchedule[selectedDay].map((item, idx) =>
+              React.createElement('div', { 
+                key: idx, 
+                className: `${getActivityColor(item.type)} p-4 rounded-xl flex items-center gap-4`,
+                onDragOver: item.type === 'flexible' ? (e) => e.preventDefault() : undefined,
+                onDrop: item.type === 'flexible' ? () => handleSlotDrop(item.key) : undefined
+              },
+                React.createElement('div', { className: 'font-bold text-purple-700 min-w-[140px]' }, item.time),
+                React.createElement('div', { className: 'flex-1' },
+                  item.type === 'flexible'
+                    ? React.createElement('input', {
+                        type: 'text',
+                        value: flexibleSlots[item.key] || '',
+                        onChange: (e) => updateFlexibleSlot(item.key, e.target.value),
+                        placeholder: 'Type a to-do item here or drag one from the list above...',
+                        className: 'w-full bg-white border-2 border-green-400 rounded-lg px-4 py-2 focus:outline-none focus:border-green-600'
+                      })
+                    : (
+                      item.type === 'assigned'
+                        ? React.createElement('div', { className: 'flex items-center justify-between' },
+                            React.createElement('div', { className: 'text-lg' }, item.activity),
+                            React.createElement('button', {
+                              onClick: () => unassignSlot(selectedDay, idx),
+                              className: 'ml-4 text-sm text-red-600 hover:text-red-800 px-2 py-1 rounded'
+                            }, '↩️ Unassign')
+                          )
+                        : React.createElement('div', { className: 'text-lg' }, item.activity)
+                    )
+                )
+              )
+            )
+          )
+        )
+      ),
       
+      // Move the todo list below the schedule
       React.createElement('div', { className: 'bg-yellow-50 border-4 border-dashed border-yellow-400 rounded-2xl p-6 mb-8' },
         React.createElement('h2', { className: 'text-2xl font-bold text-purple-600 mb-2' }, '📝 This Week\'s To-Do Items'),
         React.createElement('p', { className: 'text-gray-600 mb-4' }, 'Check them off when done, or fill them into the open time slots!'),
@@ -473,109 +602,7 @@ const KidsSchedulePWA = () => {
           }, '➕ Add')
         )
       ),
-      
-      React.createElement('div', { className: 'flex gap-3 justify-center mb-8 flex-wrap' },
-        React.createElement('button', {
-          onClick: () => setView('grid'),
-          className: `px-6 py-3 rounded-xl font-bold text-lg transition-all ${view === 'grid' ? 'bg-purple-600 text-white shadow-lg' : 'bg-purple-100 text-purple-600 hover:bg-purple-200'}`
-        }, '📊 See Whole Week'),
-        React.createElement('button', {
-          onClick: () => setView('single'),
-          className: `px-6 py-3 rounded-xl font-bold text-lg transition-all ${view === 'single' ? 'bg-purple-600 text-white shadow-lg' : 'bg-purple-100 text-purple-600 hover:bg-purple-200'}`
-        }, '📱 One Day at a Time')
-      ),
-      
-      view === 'grid' && React.createElement('div', {
-        className: 'flex gap-6 overflow-x-auto pb-4 -mx-6 px-6',
-        style: { scrollSnapType: 'x mandatory' }
-      },
-        Object.entries(weekSchedule).map(([day, activities]) =>
-          React.createElement('div', {
-            key: day,
-            className: 'bg-gray-50 rounded-xl p-4 shadow-md flex-shrink-0 min-w-[260px] flex flex-col',
-            style: { scrollSnapAlign: 'center' }
-          },
-            React.createElement('div', { className: `${day === 'sat' || day === 'sun' ? 'bg-green-500' : 'bg-purple-600'} text-white p-3 rounded-lg text-center font-bold text-lg mb-4 w-full` }, dayNames[day]),
-            activities.map((item, idx) =>
-              React.createElement('div', { key: idx, className: `${getActivityColor(item.type)} p-3 mb-2 rounded-lg w-full flex items-center justify-between` },
-                React.createElement('div', { className: 'font-bold text-purple-700 text-sm' }, item.time),
-                React.createElement('div', {
-                  className: 'text-sm mt-1 flex-1 text-center',
-                  onDragOver: (e) => e.preventDefault(),
-                  onDrop: item.type === 'flexible' ? () => handleSlotDrop(item.key) : undefined
-                },
-                  item.type === 'flexible'
-                    ? React.createElement('input', {
-                        type: 'text',
-                        value: flexibleSlots[item.key] || '',
-                        onChange: (e) => updateFlexibleSlot(item.key, e.target.value),
-                        placeholder: 'Type a to-do here or drag one from above...',
-                        className: 'w-full bg-white border border-green-400 rounded px-2 py-1 text-xs focus:outline-none focus:border-green-600 cursor-pointer'
-                      })
-                    : (
-                      item.type === 'assigned'
-                        ? React.createElement('div', { className: 'flex items-center justify-center gap-2' },
-                            React.createElement('span', null, item.activity),
-                            React.createElement('button', {
-                              onClick: () => unassignSlot(day, idx),
-                              className: 'text-sm text-red-600 hover:text-red-800 px-2 py-1 rounded'
-                            }, '↩️ Unassign')
-                          )
-                        : item.activity
-                    )
-                )
-              )
-            )
-          )
-        )
-      ),
-      
-      view === 'single' && React.createElement('div', null,
-        React.createElement('div', { className: 'flex gap-2 justify-center mb-6 flex-wrap' },
-          Object.keys(dayNames).map(day =>
-            React.createElement('button', {
-              key: day,
-              onClick: () => setSelectedDay(day),
-              className: `px-4 py-2 rounded-lg font-bold transition-all ${selectedDay === day ? 'bg-purple-600 text-white' : 'bg-white border-2 border-purple-600 text-purple-600 hover:bg-purple-100'}`
-            }, dayNames[day])
-          )
-        ),
-        React.createElement('h2', { className: 'text-3xl font-bold text-purple-600 text-center mb-6' }, dayNames[selectedDay]),
-        React.createElement('div', { className: 'space-y-3' },
-          weekSchedule[selectedDay].map((item, idx) =>
-            React.createElement('div', { 
-              key: idx, 
-              className: `${getActivityColor(item.type)} p-4 rounded-xl flex items-center gap-4`,
-              onDragOver: item.type === 'flexible' ? (e) => e.preventDefault() : undefined,
-              onDrop: item.type === 'flexible' ? () => handleSlotDrop(item.key) : undefined
-            },
-              React.createElement('div', { className: 'font-bold text-purple-700 min-w-[140px]' }, item.time),
-              React.createElement('div', { className: 'flex-1' },
-                item.type === 'flexible'
-                  ? React.createElement('input', {
-                      type: 'text',
-                      value: flexibleSlots[item.key] || '',
-                      onChange: (e) => updateFlexibleSlot(item.key, e.target.value),
-                      placeholder: 'Type a to-do item here or drag one from the list above...',
-                      className: 'w-full bg-white border-2 border-green-400 rounded-lg px-4 py-2 focus:outline-none focus:border-green-600'
-                    })
-                  : (
-                    item.type === 'assigned'
-                      ? React.createElement('div', { className: 'flex items-center justify-between' },
-                          React.createElement('div', { className: 'text-lg' }, item.activity),
-                          React.createElement('button', {
-                            onClick: () => unassignSlot(selectedDay, idx),
-                            className: 'ml-4 text-sm text-red-600 hover:text-red-800 px-2 py-1 rounded'
-                          }, '↩️ Unassign')
-                        )
-                      : React.createElement('div', { className: 'text-lg' }, item.activity)
-                  )
-              )
-            )
-          )
-        )
-      ),
-      
+
       React.createElement('div', { className: 'mt-8 bg-green-50 border-2 border-green-400 rounded-xl p-6' },
         React.createElement('h3', { className: 'text-xl font-bold text-green-800 mb-3' }, '💡 Tips for Using This Schedule:'),
         React.createElement('div', { className: 'space-y-2 text-green-900' },
