@@ -23,6 +23,7 @@ const KidsSchedulePWA = () => {
     sun: ''
   });
   const [newTodoText, setNewTodoText] = useState('');
+  const [draggedTodoId, setDraggedTodoId] = useState(null);
 
   useEffect(() => {
     const savedTodos = JSON.parse(localStorage.getItem('kidsTodos') || '[]');
@@ -63,6 +64,24 @@ const KidsSchedulePWA = () => {
 
   const updateFlexibleSlot = (day, value) => {
     setFlexibleSlots({ ...flexibleSlots, [day]: value });
+  };
+
+  const handleTodoDragStart = (todoId) => {
+    setDraggedTodoId(todoId);
+  };
+
+  const handleTodoDragEnd = () => {
+    setDraggedTodoId(null);
+  };
+
+  const handleSlotDrop = (day) => {
+    if (draggedTodoId !== null) {
+      const draggedTodo = todos.find(t => t.id === draggedTodoId);
+      if (draggedTodo) {
+        updateFlexibleSlot(day, draggedTodo.text);
+        setDraggedTodoId(null);
+      }
+    }
   };
 
   const weekSchedule = {
@@ -170,7 +189,13 @@ const KidsSchedulePWA = () => {
         
         React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-3 mb-4' },
           todos.map(todo =>
-            React.createElement('div', { key: todo.id, className: 'bg-white p-3 rounded-lg shadow-sm flex items-center gap-3 hover:shadow-md transition-shadow' },
+            React.createElement('div', { 
+              key: todo.id, 
+              draggable: true,
+              onDragStart: () => handleTodoDragStart(todo.id),
+              onDragEnd: handleTodoDragEnd,
+              className: `bg-white p-3 rounded-lg shadow-sm flex items-center gap-3 hover:shadow-md transition-shadow cursor-grab ${draggedTodoId === todo.id ? 'opacity-50 bg-purple-100' : ''}` 
+            },
               React.createElement('button', { onClick: () => toggleTodo(todo.id), className: 'flex-shrink-0' },
                 todo.completed ? '✅' : '⬜'
               ),
@@ -214,14 +239,18 @@ const KidsSchedulePWA = () => {
             activities.map((item, idx) =>
               React.createElement('div', { key: idx, className: `${getActivityColor(item.type)} p-3 mb-2 rounded-lg` },
                 React.createElement('div', { className: 'font-bold text-purple-700 text-sm' }, item.time),
-                React.createElement('div', { className: 'text-sm mt-1' },
+                React.createElement('div', { 
+                  className: 'text-sm mt-1',
+                  onDragOver: (e) => e.preventDefault(),
+                  onDrop: item.type === 'flexible' ? () => handleSlotDrop(item.key) : undefined
+                },
                   item.type === 'flexible' 
                     ? React.createElement('input', {
                         type: 'text',
                         value: flexibleSlots[item.key] || '',
                         onChange: (e) => updateFlexibleSlot(item.key, e.target.value),
-                        placeholder: 'Type a to-do here...',
-                        className: 'w-full bg-white border border-green-400 rounded px-2 py-1 text-xs focus:outline-none focus:border-green-600'
+                        placeholder: 'Type a to-do here or drag one from above...',
+                        className: 'w-full bg-white border border-green-400 rounded px-2 py-1 text-xs focus:outline-none focus:border-green-600 cursor-pointer'
                       })
                     : item.activity
                 )
@@ -244,7 +273,12 @@ const KidsSchedulePWA = () => {
         React.createElement('h2', { className: 'text-3xl font-bold text-purple-600 text-center mb-6' }, dayNames[selectedDay]),
         React.createElement('div', { className: 'space-y-3' },
           weekSchedule[selectedDay].map((item, idx) =>
-            React.createElement('div', { key: idx, className: `${getActivityColor(item.type)} p-4 rounded-xl flex items-center gap-4` },
+            React.createElement('div', { 
+              key: idx, 
+              className: `${getActivityColor(item.type)} p-4 rounded-xl flex items-center gap-4`,
+              onDragOver: item.type === 'flexible' ? (e) => e.preventDefault() : undefined,
+              onDrop: item.type === 'flexible' ? () => handleSlotDrop(item.key) : undefined
+            },
               React.createElement('div', { className: 'font-bold text-purple-700 min-w-[140px]' }, item.time),
               React.createElement('div', { className: 'flex-1' },
                 item.type === 'flexible'
@@ -252,7 +286,7 @@ const KidsSchedulePWA = () => {
                       type: 'text',
                       value: flexibleSlots[item.key] || '',
                       onChange: (e) => updateFlexibleSlot(item.key, e.target.value),
-                      placeholder: 'Type a to-do item here...',
+                      placeholder: 'Type a to-do item here or drag one from the list above...',
                       className: 'w-full bg-white border-2 border-green-400 rounded-lg px-4 py-2 focus:outline-none focus:border-green-600'
                     })
                   : React.createElement('div', { className: 'text-lg' }, item.activity)
@@ -286,4 +320,5 @@ const KidsSchedulePWA = () => {
   );
 };
 
-ReactDOM.render(React.createElement(KidsSchedulePWA), document.getElementById('root'));
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(KidsSchedulePWA));
