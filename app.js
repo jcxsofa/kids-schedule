@@ -463,36 +463,34 @@ const KidsSchedulePWA = () => {
         }, '📱 One Day at a Time')
       ),
       
-      view === 'grid' && React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4' },
-        React.createElement('div', {
-          className: 'flex gap-6 overflow-x-auto pb-4',
-          style: { scrollSnapType: 'x mandatory' }
-        },
-          Object.entries(weekSchedule).map(([day, activities]) =>
-            React.createElement('div', {
-              key: day,
-              className: 'bg-gray-50 rounded-xl p-4 shadow-md flex-shrink-0 min-w-[220px] flex flex-col items-center',
-              style: { scrollSnapAlign: 'center' }
-            },
-              React.createElement('div', { className: `${day === 'sat' || day === 'sun' ? 'bg-green-500' : 'bg-purple-600'} text-white p-3 rounded-lg text-center font-bold text-lg mb-4 w-full` }, dayNames[day]),
-              activities.map((item, idx) =>
-                React.createElement('div', { key: idx, className: `${getActivityColor(item.type)} p-3 mb-2 rounded-lg w-full flex items-center justify-between` },
-                  React.createElement('div', { className: 'font-bold text-purple-700 text-sm' }, item.time),
-                  React.createElement('div', {
-                    className: 'text-sm mt-1 flex-1 text-center',
-                    onDragOver: (e) => e.preventDefault(),
-                    onDrop: item.type === 'flexible' ? () => handleSlotDrop(item.key) : undefined
-                  },
-                    item.type === 'flexible'
-                      ? React.createElement('input', {
-                          type: 'text',
-                          value: flexibleSlots[item.key] || '',
-                          onChange: (e) => updateFlexibleSlot(item.key, e.target.value),
-                          placeholder: 'Type a to-do here or drag one from above...',
-                          className: 'w-full bg-white border border-green-400 rounded px-2 py-1 text-xs focus:outline-none focus:border-green-600 cursor-pointer'
-                        })
-                      : item.activity
-                  )
+      view === 'grid' && React.createElement('div', {
+        className: 'flex gap-6 overflow-x-auto pb-4 -mx-6 px-6',
+        style: { scrollSnapType: 'x mandatory' }
+      },
+        Object.entries(weekSchedule).map(([day, activities]) =>
+          React.createElement('div', {
+            key: day,
+            className: 'bg-gray-50 rounded-xl p-4 shadow-md flex-shrink-0 min-w-[260px] flex flex-col',
+            style: { scrollSnapAlign: 'center' }
+          },
+            React.createElement('div', { className: `${day === 'sat' || day === 'sun' ? 'bg-green-500' : 'bg-purple-600'} text-white p-3 rounded-lg text-center font-bold text-lg mb-4 w-full` }, dayNames[day]),
+            activities.map((item, idx) =>
+              React.createElement('div', { key: idx, className: `${getActivityColor(item.type)} p-3 mb-2 rounded-lg w-full flex items-center justify-between` },
+                React.createElement('div', { className: 'font-bold text-purple-700 text-sm' }, item.time),
+                React.createElement('div', {
+                  className: 'text-sm mt-1 flex-1 text-center',
+                  onDragOver: (e) => e.preventDefault(),
+                  onDrop: item.type === 'flexible' ? () => handleSlotDrop(item.key) : undefined
+                },
+                  item.type === 'flexible'
+                    ? React.createElement('input', {
+                        type: 'text',
+                        value: flexibleSlots[item.key] || '',
+                        onChange: (e) => updateFlexibleSlot(item.key, e.target.value),
+                        placeholder: 'Type a to-do here or drag one from above...',
+                        className: 'w-full bg-white border border-green-400 rounded px-2 py-1 text-xs focus:outline-none focus:border-green-600 cursor-pointer'
+                      })
+                    : item.activity
                 )
               )
             )
