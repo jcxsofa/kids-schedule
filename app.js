@@ -1,5 +1,4 @@
 const { useState, useEffect } = React;
-const { Calendar, CheckSquare, Square, Trash2, Plus } = lucideReact;
 
 const KidsSchedulePWA = () => {
   const [view, setView] = useState('grid');
